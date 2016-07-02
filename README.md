@@ -1,0 +1,2 @@
+This is a tool for working with the [Community Health Status Indicators](http://www.healthdata.gov/dataset/community-health-status-indicators-chsi-combat-obesity-heart-disease-and-cancer) dataset.
+More information will be added soon.
