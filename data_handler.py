@@ -150,15 +150,17 @@ class CHSIDataHandler:
         defaults = data.mean()
         data.fillna(value = defaults[data.columns], inplace=True)
         
-    def simplify_indicators(self, data):
+    def fix_indicators(self, data):
+        #Make all indicator columns +/-1
         for col_name in data.columns:
-            if col_name.startswith('RHI_'):
-                data[col_name] = data[col_name] % 2
+            if col_name.endswith('_Ind'):
+                #This throws out the peer component of the RHI indicators
+                data[col_name] = 2*(data[col_name] % 2) - 1                    
                 
     def prepared_data(self, threshold):
         data = self.county_data_good_columns(threshold).copy()
         self.drop_columns(data)
-        self.simplify_indicators(data)
+        self.fix_indicators(data)
         self.normalize_by_population(data)
         self.normalize_by_area(data)
         self.normalize_by_years(data)
