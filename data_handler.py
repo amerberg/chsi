@@ -165,10 +165,13 @@ class CHSIDataHandler:
         try:
             return self._defaults[frozenset(columns)]
         except KeyError:
-            defaults = self.all_county_data()[columns].median()
+            all_data = self.all_county_data()
+            defaults = all_data[columns].median()
             for column in columns:
                 if column.endswith("_Ind"):
                     defaults[column] = 0
+                elif "US_" + column in list(all_data.columns):
+                    defaults[column] = all_data["US_" + column][0]
             self._defaults[frozenset(columns)] = defaults
             return defaults
         
@@ -179,8 +182,8 @@ class CHSIDataHandler:
                 #This throws out the peer component of the RHI indicators
                 data[col_name] = 2*(data[col_name] % 2) - 1                    
                 
-    def prepared_data(self, impute=True):
-        data = self.county_data_good_columns(require_dependent=False).copy()
+    def prepared_data(self, impute=True, require_dependent=True):
+        data = self.county_data_good_columns(require_dependent=require_dependent).copy()
         self.drop_columns(data)
         self.fix_indicators(data)
         self.normalize_by_population(data)
@@ -193,10 +196,14 @@ class CHSIDataHandler:
         return data
         
     def training_data(self):
-        data = self.prepared_data()
+        data = self.prepared_data(impute=True, require_dependent=True)
         X = data.select_dtypes(include=[np.number]).drop([self._dependent], axis=1)
         Y = data[self._dependent]
         return X,Y
+        
+    def all_predictors(self):
+        data = self.prepared_data(impute=True, require_dependent=False)
+        return data.select_dtypes(include=[np.number]).drop([self._dependent], axis=1)
         
     def export_data(self, path, extra_columns=None):
         data = self.prepared_data(impute=False)
