@@ -3,9 +3,11 @@ import numpy as np
 import os
 
 class CHSIDataHandler:
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, predict_col, exclude_cols=[]):
         self.data_dir = data_dir
         self._cache = {}
+        self._exclude_cols = exclude_cols
+        self._predict_col = predict_col
         
     def csv_path(self, name):
         filename = self.filename(name)
@@ -96,11 +98,12 @@ class CHSIDataHandler:
         
     def county_data_good_columns(self, threshold):
         all_cols = self.county_data_with_health_status()
-        return all_cols.loc[:,(all_cols.isnull()).mean(axis=0)<threshold]
+        return all_cols.loc[:,(all_cols.isnull()).mean(axis=0) < threshold]
         
     def drop_columns(self, data):
         drop = [name for name in data.columns if self._non_county_col(name)]
-        drop += ['Strata_ID_Number']
+        drop += ['Strata_ID_Number', 'Number_Counties']
+        drop += self._exclude_cols
         data.drop(drop, axis=1, inplace=True)
     
     def _non_county_col(self, name):
@@ -133,7 +136,7 @@ class CHSIDataHandler:
     def normalize_by_years(self, data):
         #TODO: also deal with length of time intervals
         years = self.mbd().MOBD_Time_Span.str.split('-')
-        span = years.str.get(1).astype(int)-years.str.get(0).astype(int)+1
+        span = years.str.get(1).astype(int) - years.str.get(0).astype(int)+1
         
         col_names = ['Ecol_Rpt', 'Salm_Rpt', 'Shig_Rpt',
                      'CRS_Rpt', 'FluB_Rpt', 'HepA_Rpt', 'HepB_Rpt', 
@@ -157,7 +160,7 @@ class CHSIDataHandler:
                 #This throws out the peer component of the RHI indicators
                 data[col_name] = 2*(data[col_name] % 2) - 1                    
                 
-    def prepared_data(self, threshold):
+    def prepared_data(self, threshold, impute=True):
         data = self.county_data_good_columns(threshold).copy()
         self.drop_columns(data)
         self.fix_indicators(data)
@@ -165,15 +168,25 @@ class CHSIDataHandler:
         self.normalize_by_area(data)
         self.normalize_by_years(data)
         #TODO: should probably drop Broomfield, CO
-        self.impute_missing(data)
+        if impute:
+            self.impute_missing(data)
         
         return data
         
     def training_data(self, threshold):
-        all_data = self.prepared_data(threshold)
-        X = all_data.select_dtypes(include=[np.number]).drop(['Health_Status'], axis=1)
-        Y = all_data.Health_Status
+        data = self.prepared_data(threshold)
+        X = data.select_dtypes(include=[np.number]).drop([self._predict_col], axis=1)
+        Y = data[self._predict_col]
         return X,Y
+        
+    def export_data(self, threshold, path):
+        data = self.prepared_data(threshold, impute=False)
+        state_fips = pd.Series(data.index.get_level_values(0).values).apply(lambda x: str(x).zfill(2))
+        county_fips = pd.Series(data.index.get_level_values(1).values).apply(lambda x: str(x).zfill(3))
+        county_id = state_fips.str.cat(county_fips)
+        county_id.index = data.index
+        data.insert(0, 'county_id', county_id)
+        data.to_csv(path, index=False)
         
     def demographics(self):
         return self.get_page('DEMOGRAPHICS')
@@ -191,7 +204,7 @@ class CHSIDataHandler:
         return self.get_page('RELATIVE_HEALTH_IMPORTANCE')
         
     def vpeh(self):
-        return self.get_page('VULNERABLE_POPS_AND_ENVIRONMENTAL_HEALTH')
+        return self.get_page('VULNERABLE_POPS_AND_ENV_HEALTH')
         
     def rfac(self):
         return self.get_page('RISK_FACTORS_AND_ACCESS_TO_CARE')
