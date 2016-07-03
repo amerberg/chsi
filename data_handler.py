@@ -165,7 +165,7 @@ class CHSIDataHandler:
         try:
             return self._defaults[frozenset(columns)]
         except KeyError:
-            all_data = self.all_county_data()
+            all_data = self.prepared_data(impute=False, require_dependent=False)
             defaults = all_data[columns].median()
             for column in columns:
                 if column.endswith("_Ind"):
@@ -206,7 +206,7 @@ class CHSIDataHandler:
         return data.select_dtypes(include=[np.number]).drop([self._dependent], axis=1)
         
     def export_data(self, path, extra_columns=None):
-        data = self.prepared_data(impute=False)
+        data = self.prepared_data(impute=False, require_dependent=False)
         state_fips = pd.Series(data.index.get_level_values(0).values).apply(lambda x: str(x))
         county_fips = pd.Series(data.index.get_level_values(1).values).apply(lambda x: str(x).zfill(3))
         county_id = state_fips.str.cat(county_fips)
@@ -214,7 +214,7 @@ class CHSIDataHandler:
         data.insert(0, 'county_id', county_id)
         if extra_columns is not None:
             data = data.join(extra_columns)
-        data.to_csv(path, index=False, na_rep='na')
+        data.to_csv(path, index=False, na_rep='NA')
         
     def demographics(self):
         return self.get_page('DEMOGRAPHICS')
