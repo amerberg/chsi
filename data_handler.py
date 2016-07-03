@@ -3,11 +3,13 @@ import numpy as np
 import os
 
 class CHSIDataHandler:
-    def __init__(self, data_dir, predict_col, exclude_cols=[]):
+    def __init__(self, data_dir, dependent='Health_Status', exclude_cols=[], threshold=0.9):
         self.data_dir = data_dir
         self._cache = {}
         self._exclude_cols = exclude_cols
-        self._predict_col = predict_col
+        self._dependent = dependent
+        self._threshold = threshold
+        self._defaults = {}
         
     def csv_path(self, name):
         filename = self.filename(name)
@@ -92,13 +94,20 @@ class CHSIDataHandler:
             self._all_county_data = pd.concat(pieces, axis=1)
             return self._all_county_data
             
-    def county_data_with_health_status(self):
+    def county_data_with_dependent(self):
         county_data = self.all_county_data()
-        return county_data.loc[county_data.Health_Status.notnull(),:]
+        return county_data.loc[county_data[self._dependent].notnull(),:]
         
-    def county_data_good_columns(self, threshold):
-        all_cols = self.county_data_with_health_status()
-        return all_cols.loc[:,(all_cols.isnull()).mean(axis=0) < threshold]
+    def county_data_good_columns(self, require_dependent=True):
+        if require_dependent:
+            all_cols = self.county_data_with_dependent()
+        else:
+            all_cols = self.all_county_data()
+        return all_cols.loc[:,self.good_cols()]
+        
+    def good_cols(self):
+        all_cols = self.county_data_with_dependent()
+        return (all_cols.isnull()).mean(axis=0) < self._threshold
         
     def drop_columns(self, data):
         drop = [name for name in data.columns if self._non_county_col(name)]
@@ -134,7 +143,6 @@ class CHSIDataHandler:
                 pass
             
     def normalize_by_years(self, data):
-        #TODO: also deal with length of time intervals
         years = self.mbd().MOBD_Time_Span.str.split('-')
         span = years.str.get(1).astype(int) - years.str.get(0).astype(int)+1
         
@@ -150,8 +158,19 @@ class CHSIDataHandler:
                 pass
         
     def impute_missing(self, data):
-        defaults = data.mean()
-        data.fillna(value = defaults[data.columns], inplace=True)
+        defaults = self.get_defaults(data.columns)
+        data.fillna(value = defaults, inplace=True)
+        
+    def get_defaults(self, columns):
+        try:
+            return self._defaults[frozenset(columns)]
+        except KeyError:
+            defaults = self.all_county_data()[columns].median()
+            for column in columns:
+                if column.endswith("_Ind"):
+                    defaults[column] = 0
+            self._defaults[frozenset(columns)] = defaults
+            return defaults
         
     def fix_indicators(self, data):
         #Make all indicator columns +/-1
@@ -160,8 +179,8 @@ class CHSIDataHandler:
                 #This throws out the peer component of the RHI indicators
                 data[col_name] = 2*(data[col_name] % 2) - 1                    
                 
-    def prepared_data(self, threshold, impute=True):
-        data = self.county_data_good_columns(threshold).copy()
+    def prepared_data(self, impute=True):
+        data = self.county_data_good_columns(require_dependent=False).copy()
         self.drop_columns(data)
         self.fix_indicators(data)
         self.normalize_by_population(data)
@@ -173,20 +192,22 @@ class CHSIDataHandler:
         
         return data
         
-    def training_data(self, threshold):
-        data = self.prepared_data(threshold)
-        X = data.select_dtypes(include=[np.number]).drop([self._predict_col], axis=1)
-        Y = data[self._predict_col]
+    def training_data(self):
+        data = self.prepared_data()
+        X = data.select_dtypes(include=[np.number]).drop([self._dependent], axis=1)
+        Y = data[self._dependent]
         return X,Y
         
-    def export_data(self, threshold, path):
-        data = self.prepared_data(threshold, impute=False)
-        state_fips = pd.Series(data.index.get_level_values(0).values).apply(lambda x: str(x).zfill(2))
+    def export_data(self, path, extra_columns=None):
+        data = self.prepared_data(impute=False)
+        state_fips = pd.Series(data.index.get_level_values(0).values).apply(lambda x: str(x))
         county_fips = pd.Series(data.index.get_level_values(1).values).apply(lambda x: str(x).zfill(3))
         county_id = state_fips.str.cat(county_fips)
         county_id.index = data.index
         data.insert(0, 'county_id', county_id)
-        data.to_csv(path, index=False)
+        if extra_columns is not None:
+            data = data.join(extra_columns)
+        data.to_csv(path, index=False, na_rep='na')
         
     def demographics(self):
         return self.get_page('DEMOGRAPHICS')
