@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<style>
+
+.counties {
+  fill: none;
+}
+
+.states {
+  fill: none;
+  stroke: #fff;
+  stroke-linejoin: round;
+}
+
+.missing-data {fill:linen}
+.q0-9 { fill:rgb(247,252,253); }
+.q1-9 { fill:rgb(229,245,249); }
+.q2-9 { fill:rgb(204,236,230); }
+.q3-9 { fill:rgb(153,216,201); }
+.q4-9 { fill:rgb(102,194,164); }
+.q5-9 { fill:rgb(65,174,118); }
+.q6-9 { fill:rgb(35,139,69); }
+.q7-9 { fill:rgb(0,109,44); }
+.q8-9 { fill:rgb(0,68,27); }
+
+</style>
+<title>CHSI data</title>
+</head>
+<body>
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script src="//d3js.org/queue.v1.min.js"></script>
+<script src="//d3js.org/topojson.v1.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.0.0.min.js"   integrity="sha256-JmvOoLtYsmqlsWxa7mDSLMwa6dZ9rrIdtrrVYRnDRH0="   crossorigin="anonymous"></script>
+<form>
+  <select id='column'>
+    <option value='Health_Status'>Health Status (Actual)</option>
+    <option value='Predicted_Health_Status'>Health Status (Predicted)</option>
+  </select>
+</form>
+<script>
+
+$('#column').change(color_map);
+
+//var column = $('#column').val()
+var width = 960,
+    height = 600;
+
+var valueById = d3.map();
+
+var quantize = d3.scale.quantize()
+    .domain([0, 50])
+    .range(d3.range(9).map(function(i) { return "q" + i + "-9"; }));
+
+var projection = d3.geo.albersUsa()
+    .scale(1280)
+    .translate([width / 2, height / 2]);
+
+var path = d3.geo.path()
+    .projection(projection);
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+queue()
+    .defer(d3.json, "us.json")
+    .defer(d3.csv, "processed.csv", function(d) {valueById.set(d['county_id'], d); })
+    .await(draw_map);
+
+function county_class(d, column) {
+  try{
+    value = +valueById.get(d.id)[column];
+    if(isNaN(value)) {
+      return "missing-data"
+    }
+    else {
+      return quantize(value)
+    }
+  }
+  catch(err){
+    return ""
+  }
+}
+
+function draw_map(error, us) {
+  if (error) throw error;
+
+  svg.append("g")
+      .attr("class", "counties")
+    .selectAll("path")
+      .data(topojson.feature(us, us.objects.counties).features)
+    .enter().append("path")
+      .classed({"county" : true})
+      .attr("d", path);
+
+  svg.append("path")
+      .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+      .attr("class", "states")
+      .attr("d", path);
+      
+  color_map()
+}
+
+function color_map() {
+  var column = $('#column').val()
+  svg.selectAll("path.county")
+  .attr("class", function(d) {return county_class(d, column)})
+  .classed({"county" : true})
+}
+
+d3.select(self.frameElement).style("height", height + "px");
+
+</script>
+</body>
+</html>
