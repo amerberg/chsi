@@ -60,8 +60,13 @@ var valueById = d3.map();
 var maxById = d3.map();
 
 function quantize(column){
+  var values = valueById.values().map(function(d){return +d[column];});
+  values = values.filter(function(element, index, array){return !isNaN(element)})
+  var maximum = Math.max.apply(null, values);
+  var minimum = Math.min.apply(null, values);
+
   return d3.scale.quantize()
-    .domain([0, +maxById.get(column)])
+    .domain([minimum, maximum])
     .range(d3.range(9).map(function(i) { return "q" + i + "-9"; }));
 }
 
@@ -79,18 +84,16 @@ var svg = d3.select("body").append("svg")
 queue()
     .defer(d3.json, "us.json")
     .defer(d3.csv, "processed.csv", function(d) {valueById.set(d['county_id'], d); })
-    .defer(d3.csv, "maxima.csv", function(d) {maxById.set(d['property'], d['max']); })
     .await(draw_map);
 
-function county_class(d, column) {
+function county_class(d, column, quantize) {
   try{
     value = +valueById.get(d.id)[column];
     if(isNaN(value)) {
       return "missing-data"
     }
     else {
-      q = quantize(column)
-      return q(value)
+      return quantize(value)
     }
   }
   catch(err){
@@ -118,10 +121,11 @@ function draw_map(error, us) {
 }
 
 function color_map() {
-  var column = $('#column').val()
+  var column = $('#column').val();
+  q = quantize(column);
   svg.selectAll("path.county")
-  .attr("class", function(d) {return county_class(d, column)})
-  .classed({"county" : true})
+  .attr("class", function(d) {return county_class(d, column, q)})
+  .classed({"county" : true});
 }
 
 d3.select(self.frameElement).style("height", height + "px");
