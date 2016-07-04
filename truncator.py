@@ -11,5 +11,3 @@ class Truncator(BaseEstimator):
     def transform(self, X):
         X[(X < self.minimum) | (X > self.maximum)] = 0
         return X
-        
-        
