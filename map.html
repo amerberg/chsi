@@ -36,21 +36,26 @@
   <select id='column'>
     <option value='Health_Status'>Health Status (Actual)</option>
     <option value='Predicted_Health_Status'>Health Status (Predicted)</option>
+    <option value='Disabled_Medicare'>Medicare (Disability)</option>
+    <option value='Diabetes'>Diabetes</option>
+    <option value='Poverty'>Poverty</option>
   </select>
 </form>
 <script>
 
 $('#column').change(color_map);
 
-//var column = $('#column').val()
 var width = 960,
     height = 600;
 
 var valueById = d3.map();
+var maxById = d3.map();
 
-var quantize = d3.scale.quantize()
-    .domain([0, 50])
+function quantize(column){
+  return d3.scale.quantize()
+    .domain([0, +maxById.get(column)])
     .range(d3.range(9).map(function(i) { return "q" + i + "-9"; }));
+}
 
 var projection = d3.geo.albersUsa()
     .scale(1280)
@@ -66,6 +71,7 @@ var svg = d3.select("body").append("svg")
 queue()
     .defer(d3.json, "us.json")
     .defer(d3.csv, "processed.csv", function(d) {valueById.set(d['county_id'], d); })
+    .defer(d3.csv, "maxima.csv", function(d) {maxById.set(d['property'], d['max']); })
     .await(draw_map);
 
 function county_class(d, column) {
@@ -75,7 +81,8 @@ function county_class(d, column) {
       return "missing-data"
     }
     else {
-      return quantize(value)
+      q = quantize(column)
+      return q(value)
     }
   }
   catch(err){
