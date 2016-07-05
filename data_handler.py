@@ -10,18 +10,18 @@ class CHSIDataHandler:
         self._dependent = dependent
         self._threshold = threshold
         self._defaults = {}
-        
+    
     def csv_path(self, name):
         filename = self.filename(name)
         return os.path.join(self.data_dir, filename)
-        
+    
     def filename(self, name):
         base = name.replace('_', '').upper()
         #Account for typo in filename
         if base == 'VULNERABLEPOPSANDENVHEALTH':
-            base = 'VUNERABLEPOPSANDENVHEALTH' 
+            base = 'VUNERABLEPOPSANDENVHEALTH'
         return base + '.csv'
-        
+    
     def csv_parameters(self, name):
         county_index = ['State_FIPS_Code', 'County_FIPS_Code']
         na_values = ['-9999', '-2222', '-2222.2', '-2', '-1111', '-1111.1', '-1', '-9998.9']
@@ -40,10 +40,10 @@ class CHSIDataHandler:
         }
         
         return parameters[name]
-        
+    
     def _load_csv(self, name):
         return pd.read_csv(self.csv_path(name), **self.csv_parameters(name))
-        
+    
     def get_page(self, name):
         try:
             return self._cache[name]
@@ -51,14 +51,14 @@ class CHSIDataHandler:
             self._cache[name] = self._load_csv(name)
             self._cache[name].sort_index(inplace=True)
             return self._cache[name]
-            
+    
     def data_descriptions(self, page=None):
         descriptions = self.get_page('DATA_ELEMENT_DESCRIPTION')
         if page is None:
             return descriptions
         else:
             return descriptions.loc[(self.page_name(page), slice(None)),:]
-        
+    
     def page_name(self, name):
         return name.title().replace('_', '')
     
@@ -67,48 +67,48 @@ class CHSIDataHandler:
             return dict(self.data_descriptions().loc[self.page_name(page), name])
         else:
             return dict(self.data_descriptions().loc[(slice(None), name), :].iloc[0])
-            
+    
     def elements_by_type(self, page, dtype):
         page_elements = self.data_descriptions(page)
         return page_elements[page_elements.DATA_TYPE == dtype]
-        
+    
     def county_data_pages(self):
-        return ['DEMOGRAPHICS', 'LEADING_CAUSES_OF_DEATH', 
+        return ['DEMOGRAPHICS', 'LEADING_CAUSES_OF_DEATH',
                 'SUMMARY_MEASURES_OF_HEALTH',
                 'MEASURES_OF_BIRTH_AND_DEATH', 'RELATIVE_HEALTH_IMPORTANCE',
                 'RISK_FACTORS_AND_ACCESS_TO_CARE', 'PREVENTIVE_SERVICES_USE',
                 'VULNERABLE_POPS_AND_ENV_HEALTH']
-                
+    
     def all_county_data(self):
         try:
             return self._all_county_data
         except AttributeError:
             pages = [self.get_page(page) for page in self.county_data_pages()]
-            dup_names = ['CHSI_State_Name', 'CHSI_County_Name', 
+            dup_names = ['CHSI_State_Name', 'CHSI_County_Name',
                          'CHSI_State_Abbr', 'Strata_ID_Number']
-                     
+            
             common_cols = pages[0].loc[:, dup_names]
-            pieces = [common_cols] + [page.drop(dup_names, axis=1) 
+            pieces = [common_cols] + [page.drop(dup_names, axis=1)
                                       for page in pages]
             
             self._all_county_data = pd.concat(pieces, axis=1)
             return self._all_county_data
-            
+    
     def county_data_with_dependent(self):
         county_data = self.all_county_data()
         return county_data.loc[county_data[self._dependent].notnull(),:]
-        
+    
     def county_data_good_columns(self, require_dependent=True):
         if require_dependent:
             all_cols = self.county_data_with_dependent()
         else:
             all_cols = self.all_county_data()
         return all_cols.loc[:,self.good_cols()]
-        
+    
     def good_cols(self):
         all_cols = self.county_data_with_dependent()
         return (all_cols.isnull()).mean(axis=0) < self._threshold
-        
+    
     def drop_columns(self, data):
         drop = [name for name in data.columns if self._non_county_col(name)]
         drop += ['Strata_ID_Number', 'Number_Counties']
@@ -123,8 +123,8 @@ class CHSIDataHandler:
     def normalize_by_population(self, data):
         col_names = ['Uninsured', 'Disabled_Medicare', 'Elderly_Medicare',
                      'Unemployed', 'Ecol_Rpt', 'Salm_Rpt', 'Shig_Rpt',
-                     'CRS_Rpt', 'FluB_Rpt', 'HepA_Rpt', 'HepB_Rpt', 
-                     'Pert_Rpt', 'Syphilis_Rpt', 'Meas_Rpt', 
+                     'CRS_Rpt', 'FluB_Rpt', 'HepA_Rpt', 'HepB_Rpt',
+                     'Pert_Rpt', 'Syphilis_Rpt', 'Meas_Rpt',
                      'Total_Births', 'Total_Deaths', 'Recent_Drug_Use',
                      'Sev_Work_Disabled', 'Major_Depression']
         for name in col_names:
@@ -132,35 +132,35 @@ class CHSIDataHandler:
                 data[name] = 100 * data[name] / data['Population_Size']
             except KeyError:
                 pass
-            
+    
     def normalize_by_area(self, data):
-        col_names = ['Toxic_Chem'] 
+        col_names = ['Toxic_Chem']
         area = data['Population_Size'] / data['Population_Density']
         for name in col_names:
             try:
                 data[name] /= area
             except KeyError:
                 pass
-            
+    
     def normalize_by_years(self, data):
         years = self.mbd().MOBD_Time_Span.str.split('-')
         span = years.str.get(1).astype(int) - years.str.get(0).astype(int)+1
         
         col_names = ['Ecol_Rpt', 'Salm_Rpt', 'Shig_Rpt',
-                     'CRS_Rpt', 'FluB_Rpt', 'HepA_Rpt', 'HepB_Rpt', 
-                     'Pert_Rpt', 'Syphilis_Rpt', 'Meas_Rpt', 
+                     'CRS_Rpt', 'FluB_Rpt', 'HepA_Rpt', 'HepB_Rpt',
+                     'Pert_Rpt', 'Syphilis_Rpt', 'Meas_Rpt',
                      'Total_Births', 'Total_Deaths']
-                     
+        
         for name in col_names:
             try:
                 data[name] /= span
             except KeyError:
                 pass
-        
+    
     def impute_missing(self, data):
         defaults = self.get_defaults(data.columns)
         data.fillna(value = defaults, inplace=True)
-        
+    
     def get_defaults(self, columns):
         try:
             return self._defaults[frozenset(columns)]
@@ -174,14 +174,14 @@ class CHSIDataHandler:
                     defaults[column] = all_data["US_" + column][0]
             self._defaults[frozenset(columns)] = defaults
             return defaults
-        
+    
     def fix_indicators(self, data):
         #Make all indicator columns 0, 1
         for col_name in data.columns:
             if col_name.endswith('_Ind'):
                 #This throws out the peer component of the RHI indicators
                 data[col_name] = data[col_name] % 2
-                
+    
     def prepared_data(self, impute=True, require_dependent=True):
         data = self.county_data_good_columns(require_dependent=require_dependent).copy()
         self.drop_columns(data)
@@ -194,17 +194,20 @@ class CHSIDataHandler:
             self.impute_missing(data)
         
         return data
-        
+    
     def training_data(self):
-        data = self.prepared_data(impute=True, require_dependent=True)
-        X = data.select_dtypes(include=[np.number]).drop([self._dependent], axis=1)
-        Y = data[self._dependent]
-        return X,Y
-        
+        try:
+            return self._X, self._Y
+        except AttributeError:
+            data = self.prepared_data(impute=True, require_dependent=True)
+            self._X = data.select_dtypes(include=[np.number]).drop([self._dependent], axis=1)
+            self._Y = data[self._dependent]
+            return self._X, self._Y
+    
     def all_predictors(self):
         data = self.prepared_data(impute=True, require_dependent=False)
         return data.select_dtypes(include=[np.number]).drop([self._dependent], axis=1)
-        
+    
     def export_data(self, path, extra_columns=None):
         data = self.prepared_data(impute=False, require_dependent=False)
         state_fips = pd.Series(data.index.get_level_values(0).values).apply(lambda x: str(x))
@@ -215,24 +218,52 @@ class CHSIDataHandler:
         if extra_columns is not None:
             data = data.join(extra_columns)
         data.to_csv(path, index=False, na_rep='NA')
+    
+    def state_us_averages(self, columns):
+        county_data = self.prepared_data(impute=False, require_dependent=False)
+        county_population = county_data.Population_Size
         
+        state_average = county_data[['CHSI_State_Name', 'CHSI_State_Abbr']]\
+                    .groupby(level="State_FIPS_Code").first()
+        us_average = pd.Series()
+        
+        state_pop = county_population.sum(level="State_FIPS_Code")
+        us_pop = county_population.sum()
+        
+        for column in columns:
+            pop_weighted = county_data[column] * county_population
+            not_null_pop = county_data[column].notnull() * county_population
+            state_total = pop_weighted.sum(level='State_FIPS_Code')
+            state_not_null = not_null_pop.sum(level='State_FIPS_Code')
+            state_average[column] = state_total / state_not_null
+            #Report the percent of the population for which data was available
+            state_average[column + '_Not_Null'] = 100 * state_not_null / state_pop
+            
+            us_total = (county_data[column] * county_population).sum()
+            us_not_null_pop = (county_data[column].notnull() * county_population).sum()
+            us_average[column] = us_total / us_not_null_pop
+            us_average[column + '_Not_Null'] = 100 * us_not_null_pop / us_pop
+        
+        return state_average, us_average
+        
+    
     def demographics(self):
         return self.get_page('DEMOGRAPHICS')
-        
+    
     def lcd(self):
         return self.get_page('LEADING_CAUSES_OF_DEATH')
-        
+    
     def smh(self):
         return self.get_page('SUMMARY_MEASURES_OF_HEALTH')
-        
+    
     def mbd(self):
         return self.get_page('MEASURES_OF_BIRTH_AND_DEATH')
-        
+    
     def rhi(self):
         return self.get_page('RELATIVE_HEALTH_IMPORTANCE')
-        
+    
     def vpeh(self):
         return self.get_page('VULNERABLE_POPS_AND_ENV_HEALTH')
-        
+    
     def rfac(self):
         return self.get_page('RISK_FACTORS_AND_ACCESS_TO_CARE')
