@@ -13,7 +13,8 @@
   stroke-linejoin: round;
 }
 
-.missing-data {fill:linen}
+.missing-data {fill:linen;}
+.outlier {fill: red;}
 .q0 { fill:rgb(247,252,253); }
 .q1 { fill:rgb(229,245,249); }
 .q2 { fill:rgb(204,236,230); }
@@ -41,7 +42,6 @@
 <script src="//d3js.org/queue.v1.min.js"></script>
 <script src="//d3js.org/topojson.v1.min.js"></script>
 <script src="tip.js"></script>
-<script src="https://code.jquery.com/jquery-3.0.0.min.js"   integrity="sha256-JmvOoLtYsmqlsWxa7mDSLMwa6dZ9rrIdtrrVYRnDRH0="   crossorigin="anonymous"></script>
 <form>
   <select id='column'>
     <option value='Health_Status'>Health Status (Actual)</option>
@@ -58,10 +58,12 @@
     <option value='Unemployed'>Unemployed</option>
     <option value='Smoker'>Smoker</option>
   </select>
+  <label>Outlier threshold: </label> <input type='text' id='threshold' placeholder='standard deviations'>
 </form>
 <script>
 
-$('#column').change(colorMap);
+d3.select('form')
+  .on('change', colorMap);
 
 var width = 960,
     height = 600;
@@ -73,9 +75,30 @@ function quantileClass(quantile) {
   return "q" + quantile;
 }
 
-function quantize(column){
+function mean(numbers) {
+  total = 0;
+  for(i=0; i<numbers.length; ++i){
+    total += numbers[i];
+  }
+  return total/numbers.length
+}
+
+function stdev(numbers) {
+  avg = mean(numbers);
+  return Math.sqrt(mean(numbers.map(function(c){return Math.pow(c-avg, 2);})));
+}
+
+
+function quantize(column, sds){
   var values = valueById.values().map(function(d){return +d[column];});
-  values = values.filter(function(element, index, array){return !isNaN(element)})
+  values = values.filter(function(element){return !isNaN(element)})
+  
+  if(!isNaN(sds) && sds > 0) {
+    var sd = stdev(values);
+    var avg = mean(values);
+    values = values.filter(function(element){return element < avg+sds*sd && element > avg-sds*sd});
+  }
+  
   var maximum = Math.max.apply(null, values);
   var minimum = Math.min.apply(null, values);
 
@@ -114,10 +137,14 @@ function countyClass(d, column, quantize) {
   try{
     value = +valueById.get(d.id)[column];
     if(isNaN(value)) {
-      return "missing-data"
+      return "missing-data";
+    }
+    else if(value < quantize.domain()[0] || value > quantize.domain()[1]){
+      console.log(value, quantize.domain())
+      return "outlier";
     }
     else {
-      return quantize(value)
+      return quantize(value);
     }
   }
   catch(err){
@@ -166,8 +193,9 @@ function drawMap(error, us) {
 }
 
 function colorMap() {
-  var column = $('#column').val();
-  var q = quantize(column);
+  var column = document.getElementById('column').value
+  var sds = +document.getElementById('threshold').value
+  var q = quantize(column, sds);
   var tip = getTip(column);
   svg.call(tip);
   
