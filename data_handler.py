@@ -169,7 +169,7 @@ class CHSIDataHandler:
             defaults = all_data[columns].median()
             for column in columns:
                 if column.endswith("_Ind"):
-                    defaults[column] = 0
+                    defaults[column] = 0.5
                 elif "US_" + column in list(all_data.columns):
                     defaults[column] = all_data["US_" + column][0]
             self._defaults[frozenset(columns)] = defaults
@@ -180,7 +180,7 @@ class CHSIDataHandler:
         for col_name in data.columns:
             if col_name.endswith('_Ind'):
                 #This throws out the peer component of the RHI indicators
-                data[col_name] = 2*(data[col_name] % 2) - 1                    
+                data[col_name] = data[col_name] % 2
                 
     def prepared_data(self, impute=True, require_dependent=True):
         data = self.county_data_good_columns(require_dependent=require_dependent).copy()
