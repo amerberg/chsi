@@ -14,15 +14,15 @@
 }
 
 .missing-data {fill:linen}
-.q0-9 { fill:rgb(247,252,253); }
-.q1-9 { fill:rgb(229,245,249); }
-.q2-9 { fill:rgb(204,236,230); }
-.q3-9 { fill:rgb(153,216,201); }
-.q4-9 { fill:rgb(102,194,164); }
-.q5-9 { fill:rgb(65,174,118); }
-.q6-9 { fill:rgb(35,139,69); }
-.q7-9 { fill:rgb(0,109,44); }
-.q8-9 { fill:rgb(0,68,27); }
+.q0 { fill:rgb(247,252,253); }
+.q1 { fill:rgb(229,245,249); }
+.q2 { fill:rgb(204,236,230); }
+.q3 { fill:rgb(153,216,201); }
+.q4 { fill:rgb(102,194,164); }
+.q5 { fill:rgb(65,174,118); }
+.q6 { fill:rgb(35,139,69); }
+.q7 { fill:rgb(0,109,44); }
+.q8 { fill:rgb(0,68,27); }
 
 </style>
 <title>CHSI data</title>
@@ -59,6 +59,10 @@ var width = 960,
 var valueById = d3.map();
 var maxById = d3.map();
 
+function quantile_class(quantile) {
+  return "q" + quantile;
+}
+
 function quantize(column){
   var values = valueById.values().map(function(d){return +d[column];});
   values = values.filter(function(element, index, array){return !isNaN(element)})
@@ -67,7 +71,7 @@ function quantize(column){
 
   return d3.scale.quantize()
     .domain([minimum, maximum])
-    .range(d3.range(9).map(function(i) { return "q" + i + "-9"; }));
+    .range(d3.range(9).map(quantile_class));
 }
 
 var projection = d3.geo.albersUsa()
@@ -117,7 +121,28 @@ function draw_map(error, us) {
       .attr("class", "states")
       .attr("d", path);
       
-  color_map()
+  svg.append("g")
+    .attr("class", "key")
+    .selectAll("rect")
+    .data([0, 1, 2, 3, 4, 5, 6, 7, 8])
+    .enter().append("rect")
+    .attr("class", quantile_class)
+    .classed({"key-rect" : true})
+    .attr("x", 900)
+    .attr("y", function(d){return 250 + 20 * d;})
+    .attr("width", 20)
+    .attr("height", 20);
+    
+  svg.append("text")
+    .attr("class", "key-min")
+    .attr("x", 900)
+    .attr("y", 245);
+
+  svg.append("text")
+    .attr("class", "key-max")
+    .attr("x", 900)
+    .attr("y", 445);
+  color_map();
 }
 
 function color_map() {
@@ -126,6 +151,9 @@ function color_map() {
   svg.selectAll("path.county")
   .attr("class", function(d) {return county_class(d, column, q)})
   .classed({"county" : true});
+  
+  svg.select("text.key-min").text(Math.round(q.domain()[0]));
+  svg.select("text.key-max").text(Math.round(q.domain()[1]));
 }
 
 d3.select(self.frameElement).style("height", height + "px");
