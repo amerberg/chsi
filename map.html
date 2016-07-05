@@ -13,7 +13,7 @@
   stroke-linejoin: round;
 }
 
-.missing-data {fill:linen;}
+.missing-data {fill: linen;}
 .outlier {fill: red;}
 .q0 { fill:rgb(247,252,253); }
 .q1 { fill:rgb(229,245,249); }
@@ -38,25 +38,15 @@
 <title>CHSI data</title>
 </head>
 <body>
-<script src="//d3js.org/d3.v3.min.js"></script>
-<script src="//d3js.org/queue.v1.min.js"></script>
-<script src="//d3js.org/topojson.v1.min.js"></script>
-<script src="tip.js"></script>
+<script src="library/d3.v3.min.js"></script>
+<script src="library/queue.v1.min.js"></script>
+<script src="library/topojson.v1.min.js"></script>
+<script src="library/tip.js"></script>
+<script src="library/jquery-3.0.0.min.js"   integrity="sha256-JmvOoLtYsmqlsWxa7mDSLMwa6dZ9rrIdtrrVYRnDRH0="   crossorigin="anonymous"></script>
+<script src="library/chosen.jquery.min.js"></script>
+<link rel="stylesheet" href="library/chosen.min.css">
 <form>
   <select id='column'>
-    <option value='Health_Status'>Health Status (Actual)</option>
-    <option value='Predicted_Health_Status'>Health Status (Predicted)</option>
-    <option value='Disabled_Medicare'>Medicare (Disability)</option>
-    <option value='Diabetes'>Diabetes</option>
-    <option value='Poverty'>Poverty</option>
-    <option value='Age_65_84'>Age 65-84</option>
-    <option value='Elderly_Medicare'>Medicare (Elderly)</option>
-    <option value='No_Exercise'>No Exercise</option>
-    <option value='Under_18'>Under 18</option>
-    <option value='Sev_Work_Disabled'>Severely Work Disabled</option>
-    <option value='Obesity'>Obesity</option>
-    <option value='Unemployed'>Unemployed</option>
-    <option value='Smoker'>Smoker</option>
   </select>
   <label>Outlier threshold: </label> <input type='text' id='threshold' placeholder='standard deviations'>
 </form>
@@ -140,7 +130,6 @@ function countyClass(d, column, quantize) {
       return "missing-data";
     }
     else if(value < quantize.domain()[0] || value > quantize.domain()[1]){
-      console.log(value, quantize.domain())
       return "outlier";
     }
     else {
@@ -189,6 +178,22 @@ function drawMap(error, us) {
     .attr("class", "key-max")
     .attr("x", 900)
     .attr("y", 445);
+    
+    
+  var column = d3.select('#column')
+  var county = valueById.get(1001);
+  for (var key in county) {
+    if (county.hasOwnProperty(key) && key != 'county_id' &&
+        (county[key] == "NA" || !isNaN(+county[key]))) {
+      column.append("option")
+        .attr('value', key)
+        .text(key.split('_').join(" "));
+    }
+  }
+  
+  $('#column').chosen()
+    .change(colorMap);
+    
   colorMap();
 }
 
