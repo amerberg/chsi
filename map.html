@@ -52,9 +52,6 @@
 </form>
 <script>
 
-d3.select('form')
-  .on('change', colorMap);
-
 var width = 960,
     height = 600;
 
@@ -78,6 +75,16 @@ function stdev(numbers) {
   return Math.sqrt(mean(numbers.map(function(c){return Math.pow(c-avg, 2);})));
 }
 
+/*Borrowed from http://stackoverflow.com/posts/901144/revisions */
+function getParameterByName(name, url) {
+    if (!url) url = window.location.href;
+    name = name.replace(/[\[\]]/g, "\\$&");
+    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, " "));
+}
 
 function quantize(column, sds){
   var values = valueById.values().map(function(d){return +d[column];});
@@ -121,7 +128,7 @@ var svg = d3.select("body").append("svg")
 queue()
     .defer(d3.json, "us.json")
     .defer(d3.csv, "processed.csv", function(d) {valueById.set(d['county_id'], d); })
-    .await(drawMap);
+    .await(initialize);
 
 function countyClass(d, column, quantize) {
   try{
@@ -141,8 +148,8 @@ function countyClass(d, column, quantize) {
   }
 }
 
-function drawMap(error, us) {
-  if (error) throw error;
+function initialize(error, us) {
+  if (error) throw error;  
 
   svg.append("g")
       .attr("class", "counties")
@@ -191,10 +198,18 @@ function drawMap(error, us) {
     }
   }
   
+  //Set parameters from query string if applicable.
+  col_name = getParameterByName('column');
+  threshold = getParameterByName('threshold');
+  if(col_name != null){document.getElementById('column').value = col_name;}
+  if(threshold != null){document.getElementById('threshold').value = threshold;}
+  
   $('#column').chosen()
     .change(colorMap);
     
   colorMap();
+  
+  d3.select('form').on('change', colorMap);
 }
 
 function colorMap() {
