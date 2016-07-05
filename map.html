@@ -24,6 +24,15 @@
 .q7 { fill:rgb(0,109,44); }
 .q8 { fill:rgb(0,68,27); }
 
+.county-info {
+  line-height: 1;
+  font-weight: bold;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 2px;
+}
+
 </style>
 <title>CHSI data</title>
 </head>
@@ -31,6 +40,7 @@
 <script src="//d3js.org/d3.v3.min.js"></script>
 <script src="//d3js.org/queue.v1.min.js"></script>
 <script src="//d3js.org/topojson.v1.min.js"></script>
+<script src="tip.js"></script>
 <script src="https://code.jquery.com/jquery-3.0.0.min.js"   integrity="sha256-JmvOoLtYsmqlsWxa7mDSLMwa6dZ9rrIdtrrVYRnDRH0="   crossorigin="anonymous"></script>
 <form>
   <select id='column'>
@@ -51,7 +61,7 @@
 </form>
 <script>
 
-$('#column').change(color_map);
+$('#column').change(colorMap);
 
 var width = 960,
     height = 600;
@@ -59,7 +69,7 @@ var width = 960,
 var valueById = d3.map();
 var maxById = d3.map();
 
-function quantile_class(quantile) {
+function quantileClass(quantile) {
   return "q" + quantile;
 }
 
@@ -71,7 +81,7 @@ function quantize(column){
 
   return d3.scale.quantize()
     .domain([minimum, maximum])
-    .range(d3.range(9).map(quantile_class));
+    .range(d3.range(9).map(quantileClass));
 }
 
 var projection = d3.geo.albersUsa()
@@ -80,17 +90,27 @@ var projection = d3.geo.albersUsa()
 
 var path = d3.geo.path()
     .projection(projection);
+    
+function getTip(column){
+  return d3.tip()
+    .attr('class', 'county-info')
+    .offset([-10, 0])
+    .html(function(d) {
+      v = valueById.get(d.id);
+      return v.CHSI_County_Name + ", " + v.CHSI_State_Abbr + "<br />" + Math.round(+v[column] * 100) / 100;
+    });
+}
 
 var svg = d3.select("body").append("svg")
     .attr("width", width)
     .attr("height", height);
-
+    
 queue()
     .defer(d3.json, "us.json")
     .defer(d3.csv, "processed.csv", function(d) {valueById.set(d['county_id'], d); })
-    .await(draw_map);
+    .await(drawMap);
 
-function county_class(d, column, quantize) {
+function countyClass(d, column, quantize) {
   try{
     value = +valueById.get(d.id)[column];
     if(isNaN(value)) {
@@ -105,7 +125,7 @@ function county_class(d, column, quantize) {
   }
 }
 
-function draw_map(error, us) {
+function drawMap(error, us) {
   if (error) throw error;
 
   svg.append("g")
@@ -126,7 +146,7 @@ function draw_map(error, us) {
     .selectAll("rect")
     .data([0, 1, 2, 3, 4, 5, 6, 7, 8])
     .enter().append("rect")
-    .attr("class", quantile_class)
+    .attr("class", quantileClass)
     .classed({"key-rect" : true})
     .attr("x", 900)
     .attr("y", function(d){return 250 + 20 * d;})
@@ -142,15 +162,20 @@ function draw_map(error, us) {
     .attr("class", "key-max")
     .attr("x", 900)
     .attr("y", 445);
-  color_map();
+  colorMap();
 }
 
-function color_map() {
+function colorMap() {
   var column = $('#column').val();
-  q = quantize(column);
+  var q = quantize(column);
+  var tip = getTip(column);
+  svg.call(tip);
+  
   svg.selectAll("path.county")
-  .attr("class", function(d) {return county_class(d, column, q)})
-  .classed({"county" : true});
+  .attr("class", function(d) {return countyClass(d, column, q)})
+  .classed({"county" : true})
+  .on('mouseover', tip.show)
+  .on('mouseout', tip.hide);
   
   svg.select("text.key-min").text(Math.round(q.domain()[0]));
   svg.select("text.key-max").text(Math.round(q.domain()[1]));
