@@ -176,7 +176,7 @@ class CHSIDataHandler:
             return defaults
         
     def fix_indicators(self, data):
-        #Make all indicator columns +/-1
+        #Make all indicator columns 0, 1
         for col_name in data.columns:
             if col_name.endswith('_Ind'):
                 #This throws out the peer component of the RHI indicators
