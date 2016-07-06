@@ -38,6 +38,12 @@
   font-weight: bold;
 }
 
+text.title {
+  font-weight:bold;
+  font-size: 20pt;
+  font-face: arial;
+}
+
 </style>
 <title>CHSI data</title>
 </head>
@@ -49,7 +55,7 @@
 <script src="library/jquery-3.0.0.min.js"   integrity="sha256-JmvOoLtYsmqlsWxa7mDSLMwa6dZ9rrIdtrrVYRnDRH0="   crossorigin="anonymous"></script>
 <script src="library/chosen.jquery.min.js"></script>
 <link rel="stylesheet" href="library/chosen.min.css">
-<form>
+<form id='form'>
   <select id='column'>
   </select>
   <label>Outlier threshold: </label> <input type='text' id='threshold' placeholder='standard deviations'>
@@ -102,7 +108,7 @@ function quantize(column, sds){
   
   var maximum = Math.max.apply(null, values);
   var minimum = Math.min.apply(null, values);
-
+  
   return d3.scale.quantize()
     .domain([minimum, maximum])
     .range(d3.range(9).map(quantileClass));
@@ -114,14 +120,14 @@ var projection = d3.geo.albersUsa()
 
 var path = d3.geo.path()
     .projection(projection);
-    
+
 function getTip(column){
   return d3.tip()
     .attr('class', 'county-info')
     .offset([-10, 0])
     .html(function(d) {
       v = valueById.get(d.id);
-      return "<span class='county-name'>" + v.CHSI_County_Name + ", " + v.CHSI_State_Abbr + "</span><br />" 
+      return "<span class='county-name'>" + v.CHSI_County_Name + ", " + v.CHSI_State_Abbr + "</span><br />"
           + column + ": "+ Math.round(+v[column] * 100) / 100
           + "<br>Population: " + v.Population_Size;
     });
@@ -130,7 +136,7 @@ function getTip(column){
 var svg = d3.select("body").append("svg")
     .attr("width", width)
     .attr("height", height);
-    
+
 queue()
     .defer(d3.json, "us.json")
     .defer(d3.csv, "chsi-summary.csv", function(d) {valueById.set(d['county_id'], d); })
@@ -155,8 +161,8 @@ function countyClass(d, column, quantize) {
 }
 
 function initialize(error, us) {
-  if (error) throw error;  
-
+  if (error) throw error;
+  
   svg.append("g")
       .attr("class", "counties")
     .selectAll("path")
@@ -164,12 +170,12 @@ function initialize(error, us) {
     .enter().append("path")
       .classed({"county" : true})
       .attr("d", path);
-
+  
   svg.append("path")
       .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
       .attr("class", "states")
       .attr("d", path);
-      
+  
   svg.append("g")
     .attr("class", "key")
     .selectAll("rect")
@@ -181,18 +187,18 @@ function initialize(error, us) {
     .attr("y", function(d){return 250 + 20 * d;})
     .attr("width", 20)
     .attr("height", 20);
-    
+  
   svg.append("text")
     .attr("class", "key-min")
     .attr("x", 900)
     .attr("y", 245);
-
+  
   svg.append("text")
     .attr("class", "key-max")
     .attr("x", 900)
     .attr("y", 445);
     
-    
+  
   var column = d3.select('#column')
   var county = valueById.get(1001);
   for (var key in county) {
@@ -205,14 +211,29 @@ function initialize(error, us) {
   }
   
   //Set parameters from query string if applicable.
-  col_name = getParameterByName('column');
-  threshold = getParameterByName('threshold');
+  var col_name = getParameterByName('column');
+  var threshold = getParameterByName('threshold');
+  var title = getParameterByName('title');
+  
   if(col_name != null){document.getElementById('column').value = col_name;}
   if(threshold != null){document.getElementById('threshold').value = threshold;}
+  hide_form = getParameterByName('hide_form');
+  if(hide_form == 1){
+      d3.select('#form').style('display', 'none');
+    }
+  else{
+    $('#column').chosen().change(colorMap);
+  }
   
-  $('#column').chosen()
-    .change(colorMap);
-    
+  if(title){
+    svg.append("text")
+      .text(title)
+      .attr("text-anchor", "middle")
+      .attr("x", width/2)
+      .attr("y", 20)
+      .attr("class", "title");
+  }
+  
   colorMap();
   
   d3.select('form').on('change', colorMap);
