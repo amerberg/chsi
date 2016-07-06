@@ -27,11 +27,15 @@
 
 .county-info {
   line-height: 1;
-  font-weight: bold;
-  padding: 12px;
+  width: 200px;
+  padding: 8px;
   background: rgba(0, 0, 0, 0.8);
   color: #fff;
   border-radius: 2px;
+}
+
+.county-info .county-name {
+  font-weight: bold;
 }
 
 </style>
@@ -117,7 +121,9 @@ function getTip(column){
     .offset([-10, 0])
     .html(function(d) {
       v = valueById.get(d.id);
-      return v.CHSI_County_Name + ", " + v.CHSI_State_Abbr + "<br />" + Math.round(+v[column] * 100) / 100;
+      return "<span class='county-name'>" + v.CHSI_County_Name + ", " + v.CHSI_State_Abbr + "</span><br />" 
+          + column + ": "+ Math.round(+v[column] * 100) / 100
+          + "<br>Population: " + v.Population_Size;
     });
 }
 
