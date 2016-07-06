@@ -127,7 +127,7 @@ var svg = d3.select("body").append("svg")
     
 queue()
     .defer(d3.json, "us.json")
-    .defer(d3.csv, "processed.csv", function(d) {valueById.set(d['county_id'], d); })
+    .defer(d3.csv, "chsi-summary.csv", function(d) {valueById.set(d['county_id'], d); })
     .await(initialize);
 
 function countyClass(d, column, quantize) {
