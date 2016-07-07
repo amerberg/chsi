@@ -20,3 +20,7 @@ Other useful methods include:
   + `state_us_averages` - computes population-weighted averages for a list of columns, on the state and national levels.
   
 There are also shorthand methods for retrieving data from a given "page" (csv file), e.g. `mbd` for "MEASURESOFBIRTHANDDEATH".
+
+The notebook [weighted_ridge_regression.ipynb](weighted_ridge_regression.ipynb) models self-reported health status using scikit-learn's implementation of ridge regression.
+
+You can also explore the dataset visually with [my map](https://amerberg.github.io/chsi/map.html).
